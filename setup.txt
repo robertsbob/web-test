@@ -1,0 +1,32 @@
+# === EXAM SETUP ===
+# Run these before starting the exam
+
+
+# --- Install Claude Code ---
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Alternative (npm):
+# npm install -g @anthropic-ai/claude-code
+
+# Verify install:
+claude --version
+
+
+# --- First run (authenticate) ---
+claude
+# Follow the browser auth flow, then Ctrl+C once logged in
+
+
+# --- Launch for exam (from the AI/ folder) ---
+cd /path/to/AI
+claude --dangerously-skip-permissions --chrome
+
+
+# --- Install Chrome extension (for --chrome flag) ---
+# Search "Claude Code" in Chrome Web Store and install
+# Requires Claude Pro/Max/Teams plan
+
+
+# --- Optional: set up MCP browser tool if no Chrome extension ---
+claude mcp add playwright npx @playwright/mcp@latest
+# Then launch: claude --dangerously-skip-permissions

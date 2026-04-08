@@ -1,0 +1,59 @@
+# === CLAUDE CODE COMMANDS ===
+# Run from the AI/ folder (that's Claude's "home" per the system prompt)
+
+
+# --- Launch commands ---
+
+# Normal launch (will prompt for permissions)
+claude
+
+# Skip ALL permission prompts (use in isolated VM — this exam setup)
+claude --dangerously-skip-permissions
+
+# Alternative syntax for skip permissions
+claude --permission-mode bypassPermissions
+
+# Launch with Chrome browser integration (requires Claude Chrome extension installed)
+claude --chrome
+
+# Launch with Chrome + skip permissions (recommended for this exam)
+claude --dangerously-skip-permissions --chrome
+
+
+# --- Session management ---
+
+# Resume most recent session
+claude --resume
+
+# Print output without interactive mode (pipe-friendly)
+echo "scan http://TARGET" | claude --print
+
+# Start in a specific directory
+claude --cwd /path/to/AI
+
+
+# --- Model selection ---
+
+# Use specific model (default is latest)
+claude --model claude-opus-4-6
+claude --model claude-sonnet-4-6
+
+
+# --- MCP browser tools (add browser control via MCP) ---
+
+# Add Playwright MCP (headless browser automation)
+claude mcp add playwright npx @playwright/mcp@latest
+
+# List configured MCP servers
+claude mcp list
+
+# Remove MCP server
+claude mcp remove playwright
+
+
+# --- In-session slash commands ---
+# /chrome        — manage Chrome extension connection
+# /compact       — compress context to save tokens
+# /cost          — show token usage
+# /clear         — clear conversation
+# /help          — show all commands

