@@ -1,57 +1,112 @@
-# === RECON COMMANDS ===
-# Replace TARGET with IP or hostname (include http:// for web tools)
+# === RECON RUNBOOK ===
+# Run top-to-bottom. Background (&) slow tools so you keep moving.
+# Replace TARGET with IP or hostname. Use http://TARGET for web tools.
+# Open extra terminals for backgrounded tools if you want to watch output.
 
 
-# --- Nmap: quick scan (top 1000 ports) ---
-nmap -sV -sC -oN nmap_quick.txt TARGET
+# ============================================================
+# STEP 1 — INSTANT (seconds, do these first while you set up)
+# ============================================================
 
-# --- Nmap: full port scan (slower, catches unusual ports) ---
-nmap -sV -sC -p- --min-rate 5000 -oN nmap_full.txt TARGET
-
-# --- Nmap: UDP top 100 (slow, but finds SNMP/DNS/etc) ---
-nmap -sU --top-ports 100 -oN nmap_udp.txt TARGET
-
-# --- Nmap: vulnerability scripts ---
-nmap --script vuln -oN nmap_vuln.txt TARGET
-
-# --- WhatWeb: tech stack fingerprinting ---
+# Tech stack fingerprint
 whatweb -a 3 -v http://TARGET
 
-# --- Nikto: web server misconfig scanner ---
+# Response headers (security headers, server version, cookies)
+curl -sI http://TARGET/
+
+# Common exposed files (check each manually)
+curl -s http://TARGET/robots.txt
+curl -s http://TARGET/sitemap.xml
+curl -s http://TARGET/.git/HEAD
+curl -s http://TARGET/.env
+curl -s http://TARGET/crossdomain.xml
+
+
+# ============================================================
+# STEP 2 — FAST SCAN (wait for this ~60s — shapes everything else)
+# ============================================================
+
+# Quick port + service scan (tells you what to focus on)
+nmap -sV -sC -oN nmap_quick.txt TARGET
+
+
+# ============================================================
+# STEP 3 — BACKGROUND (launch all, don't wait — takes minutes)
+# Use separate terminals or add & to background
+# ============================================================
+
+# Directory brute force (most important — run this early)
+gobuster dir -u http://TARGET -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html,txt,js,bak,old,conf -o gobuster_dirs.txt
+
+# Web vuln scanner (catches misconfigs, headers, old software)
 nikto -h http://TARGET -o nikto.txt
 
-# --- Gobuster: directory brute force ---
-gobuster dir -u http://TARGET -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html,txt,js,bak -o gobuster_dirs.txt
+# Full port scan (catches non-standard ports, run last)
+nmap -sV -sC -p- --min-rate 5000 -oN nmap_full.txt TARGET
 
-# --- Gobuster: file extensions on found dirs ---
-gobuster dir -u http://TARGET/DIR -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,bak,old,conf -o gobuster_sub.txt
 
-# --- Gobuster: vhost enumeration ---
+# ============================================================
+# STEP 4 — WHILE STEP 3 RUNS (manual browser + quick checks)
+# ============================================================
+
+# Browse the app: register, login, look at features, check JS files
+# Check page source for comments, API keys, hidden fields
+# Pull all links from homepage
+curl -s http://TARGET/ | grep -oP 'href="[^"]*"' | sort -u
+
+# Extract JS files for endpoints/secrets
+curl -s http://TARGET/ | grep -oP 'src="[^"]*\.js"' | sort -u
+
+# Check security headers properly
+curl -sI http://TARGET/ | grep -iE 'X-Frame|Content-Security|X-Content|Strict-Transport|Access-Control|Set-Cookie'
+
+# Vhost enumeration (if domain-based app)
 gobuster vhost -u http://TARGET -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt --append-domain
 
-# --- ffuf: directory fuzzing ---
-ffuf -u http://TARGET/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -mc 200,201,301,302,401,403 -o ffuf_dirs.json
 
-# --- ffuf: parameter fuzzing (GET) ---
-ffuf -u "http://TARGET/page?FUZZ=test" -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200
+# ============================================================
+# STEP 5 — AFTER GOBUSTER FINDS PATHS (targeted fuzzing)
+# ============================================================
 
-# --- ffuf: parameter value fuzzing ---
+# Parameter fuzzing on interesting pages (replace /page with found path)
+ffuf -u "http://TARGET/page?FUZZ=test" -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200 -fs 0
+
+# Fuzz a known param's values (replace id=FUZZ)
 ffuf -u "http://TARGET/page?id=FUZZ" -w /usr/share/seclists/Fuzzing/integers.txt -mc 200
 
-# --- ffuf: POST body fuzzing ---
+# POST body param fuzzing (replace known params)
 ffuf -u http://TARGET/login -X POST -d "username=FUZZ&password=test" -w /usr/share/seclists/Usernames/top-usernames-shortlist.txt -mc 200,302
 
-# --- SQLMap: auto injection scan ---
+# Sub-directory brute force on interesting paths
+gobuster dir -u http://TARGET/api -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,json -o gobuster_api.txt
+
+
+# ============================================================
+# STEP 6 — SQLI (once you have params, run alongside manual testing)
+# ============================================================
+
+# Basic auto scan
 sqlmap -u "http://TARGET/page?id=1" --batch --level 3 --risk 2 --dbs
 
-# --- SQLMap: POST parameter ---
+# POST
 sqlmap -u "http://TARGET/login" --data="user=admin&pass=test" --batch --dbs
 
-# --- SQLMap: with session cookie ---
+# With cookie (get cookie from browser/Burp first)
 sqlmap -u "http://TARGET/page?id=1" --cookie="session=VALUE" --batch --dbs
 
-# --- SQLMap: dump specific table ---
+# Header injection (User-Agent, Referer, X-Forwarded-For)
+sqlmap -u "http://TARGET/" -H "X-Forwarded-For: *" --batch --dbs
+
+# Dump once DB found
 sqlmap -u "http://TARGET/page?id=1" --batch -D dbname -T users --dump
 
-# --- SQLMap: header injection ---
-sqlmap -u "http://TARGET/" -H "X-Forwarded-For: *" --batch --dbs
+
+# ============================================================
+# STEP 7 — AFTER FULL NMAP (service-specific follow-up)
+# ============================================================
+
+# Nmap vuln scripts on all open ports (run once full scan done)
+nmap --script vuln -p PORTS -oN nmap_vuln.txt TARGET
+
+# UDP scan (SNMP, DNS — catches easy wins sometimes)
+nmap -sU --top-ports 100 -oN nmap_udp.txt TARGET
