@@ -1,6 +1,8 @@
 # === EXAM SETUP ===
 # Run these before starting the exam
 
+# KEY: jA0ECQMI22xsgJpkb6L/0qwBauzOBKtMmMyKg1/qMHxfbvxzKxiV7bk55O1SHIL0u5q3Y2zFIu1OE2yv/v0716ayHtuldlcIiKM/SsHWLI57J3T90/Rw8F0SxAR4l2urz66LOSGSO04bD+njK7DfoMfLT/uq8ELi/uSKmqYrfMfpqI/f0mmiju92hFEERmB2m7V7wycYKRW37pl8YDCexi6H8GPucACUGkG6HF0A1oQ7ePz4OLIrIxUDgmzx
+
 
 # --- Install Claude Code ---
 curl -fsSL https://claude.ai/install.sh | bash
